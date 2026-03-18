@@ -35,8 +35,16 @@ const PERSON_MAP = {
     'Home': ['家人', '家庭', '全家']
 };
 
+function getLocalDateString() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
 let currentData = {
-    date: new Date().toISOString().split('T')[0],
+    date: getLocalDateString(),
     amount: '',
     item: '',
     category: '',
@@ -90,7 +98,7 @@ function parseInput(val) {
     // 如果沒有數字，則視為只有項目
     if (numbers.length === 0) {
         return {
-            date: new Date().toISOString().split('T')[0],
+            date: getLocalDateString(),
             item: content,
             amount: '',
             tutuAmount: '',
@@ -154,7 +162,7 @@ function parseInput(val) {
     }
 
     return {
-        date: new Date().toISOString().split('T')[0],
+        date: getLocalDateString(),
         item: item || '未命名項目',
         amount: firstAmountStr,
         tutuAmount: secondAmountStr,
