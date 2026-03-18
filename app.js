@@ -173,19 +173,15 @@ function initUI() {
                         <span class="label">項目</span>
                         <span class="value" id="viewItem">--</span>
                     </div>
-                    <div class="preview-item">
-                        <span class="label">類別</span>
+            <div class="preview-item clickable" id="boxCategory">
+                        <span class="label">類別 (點擊修改)</span>
                         <span class="value" id="viewCategory">--</span>
                     </div>
-                    <div class="preview-item" style="grid-column: span 2; margin-top: 8px;">
-                        <span class="label">對應對象</span>
+                    <div class="preview-item clickable" id="boxPerson" style="grid-column: span 2; margin-top: 8px;">
+                        <span class="label">對應對象 (點擊修改)</span>
                         <span class="value" id="viewPerson">--</span>
                     </div>
                 </div>
-            </div>
-
-            <div class="category-tags" id="categoryTags">
-                <!-- Categories will be injected here -->
             </div>
 
             <button class="btn-submit" id="submitBtn">立即儲存</button>
@@ -193,6 +189,17 @@ function initUI() {
         </div>
 
         <button class="settings-btn" id="openSettings">⚙️</button>
+
+        <!-- Selector Modal -->
+        <div class="modal" id="selectorModal">
+            <div class="modal-content">
+                <h2 id="selectorTitle">選擇</h2>
+                <div class="selector-options" id="selectorOptions"></div>
+                <div class="btn-group">
+                    <button class="btn-secondary" id="closeSelector">取消</button>
+                </div>
+            </div>
+        </div>
 
         <div class="modal" id="settingsModal">
             <div class="modal-content">
@@ -244,16 +251,10 @@ function initUI() {
     const viewCategory = document.getElementById('viewCategory');
     const viewPerson = document.getElementById('viewPerson');
     const statusMsg = document.getElementById('statusMsg');
-    const categoryTags = document.getElementById('categoryTags');
-
-    // 渲染類別標籤
-    const categories = Object.keys(CATEGORY_MAP);
-    // 加上 "其他"
-    if (!categories.includes('其他')) categories.push('其他');
-
-    categoryTags.innerHTML = categories.map(cat => `
-        <span class="category-tag">${cat}</span>
-    `).join('');
+    
+    const selectorModal = document.getElementById('selectorModal');
+    const selectorTitle = document.getElementById('selectorTitle');
+    const selectorOptions = document.getElementById('selectorOptions');
 
     mainInput.addEventListener('input', (e) => {
         const parsed = parseInput(e.target.value);
@@ -384,6 +385,50 @@ function initUI() {
         modal.style.display = 'none';
         showStatus('✅ 設定已儲存', 'success');
     });
+
+    // Selector Modal logic
+    const openSelector = (title, options, onSelect) => {
+        selectorTitle.innerText = title;
+        selectorOptions.innerHTML = options.map(opt => `
+            <div class="selector-item">${opt}</div>
+        `).join('');
+        
+        selectorModal.style.display = 'flex';
+        
+        const items = selectorOptions.querySelectorAll('.selector-item');
+        items.forEach(item => {
+            item.onclick = () => {
+                onSelect(item.innerText);
+                selectorModal.style.display = 'none';
+            };
+        });
+    };
+
+    document.getElementById('closeSelector').onclick = () => {
+        selectorModal.style.display = 'none';
+    };
+
+    document.getElementById('boxCategory').onclick = () => {
+        const categories = Object.keys(CATEGORY_MAP);
+        if (!categories.includes('其他')) categories.push('其他');
+        openSelector('選擇類別', categories, (val) => {
+            currentData.category = val;
+            viewCategory.innerText = val;
+        });
+    };
+
+    document.getElementById('boxPerson').onclick = () => {
+        const persons = Object.keys(PERSON_MAP);
+        // 如果預設值不在裡面，也加進去
+        const cfg = getConfig();
+        if (cfg.defaultPerson && !persons.includes(cfg.defaultPerson)) {
+            persons.push(cfg.defaultPerson);
+        }
+        openSelector('選擇對象', persons, (val) => {
+            currentData.person = val;
+            viewPerson.innerText = val;
+        });
+    };
 }
 
 function showStatus(msg, type) {
