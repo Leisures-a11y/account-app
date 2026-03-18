@@ -1,13 +1,13 @@
 /* 移除 @import */
 
 :root {
-    --primary: #10b981;
-    --primary-hover: #059669;
-    --bg-dark: #0f172a;
-    --card-bg: rgba(30, 41, 59, 0.7);
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --bg-dark: #020617;
+    --card-bg: rgba(15, 23, 42, 0.7);
     --text-main: #f8fafc;
     --text-dim: #94a3b8;
-    --accent: #065f46;
+    --accent: #1e1b4b;
     --success: #10b981;
     --warning: #f59e0b;
     --glass-border: rgba(255, 255, 255, 0.1);
@@ -40,8 +40,15 @@ body {
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .container {
@@ -196,7 +203,7 @@ input[type="text"]:focus {
 
 .btn-submit {
     width: 100%;
-    background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #1e1b4b 100%);
     color: white;
     border: none;
     border-radius: 16px;
@@ -205,12 +212,12 @@ input[type="text"]:focus {
     font-weight: 700;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.4);
 }
 
 .btn-submit:hover {
     transform: translateY(-2px);
-    box-shadow: 0 20px 25px -5px rgba(16, 185, 129, 0.5);
+    box-shadow: 0 20px 25px -5px rgba(37, 99, 235, 0.5);
     filter: brightness(1.1);
 }
 
@@ -314,5 +321,10 @@ input[type="text"]:focus {
     transition: all 0.3s ease;
 }
 
-.status-success { color: var(--success); }
-.status-error { color: #f43f5e; }
+.status-success {
+    color: var(--success);
+}
+
+.status-error {
+    color: #f43f5e;
+}
