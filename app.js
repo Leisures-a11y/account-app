@@ -31,8 +31,8 @@ const CATEGORY_MAP = {
 const PERSON_MAP = {
     '兔': ['兔', '兔子', '兔兔', '兔兔', '老婆'],
     'Kiwi、湯圓': ['小孩', 'kiwi', '湯圓', '兒'],
-    '龜': ['帥哥'],
-    'Home': ['家人', '家庭']
+    '龜': ['帥哥', '老公'],
+    'Home': ['家人', '家庭', '全家']
 };
 
 let currentData = {
@@ -53,11 +53,15 @@ function saveConfig(config) {
     localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
 }
 
-function getCategory(item) {
+function getCategory(text) {
+    if (!text) return '';
+    // 1. 優先檢查是否直接等於某個類別名稱
+    if (Object.keys(CATEGORY_MAP).includes(text)) return text;
+    // 2. 檢查是否包含在某個類別的關鍵字清單中
     for (const [cat, keywords] of Object.entries(CATEGORY_MAP)) {
-        if (keywords.some(k => item.includes(k))) return cat;
+        if (keywords.some(k => text.includes(k))) return cat;
     }
-    return '其他';
+    return ''; // 取消 "其他"，若無匹配則回空值
 }
 
 function getPerson(text, defaultVal = '兔') {
@@ -72,17 +76,17 @@ function getPerson(text, defaultVal = '兔') {
 function parseInput(val) {
     const config = getConfig();
     let content = val.trim();
-    
+
     // 將常見全形與半形標點符號替換為空格，並合併連續空格
     content = content.replace(/[，。！？；：、！!？?；;：:（）()[\]{}/\\|_~`'"]/g, ' ')
-                     .replace(/\s+/g, ' ')
-                     .trim();
-    
+        .replace(/\s+/g, ' ')
+        .trim();
+
     if (!content) return null;
 
     // 尋找所有數字區塊
     const numbers = content.match(/\d+/g) || [];
-    
+
     // 如果沒有數字，則視為只有項目
     if (numbers.length === 0) {
         return {
@@ -122,17 +126,30 @@ function parseInput(val) {
     }
 
     // 處理預設值與自動歸類
-    let finalCategory = categoryInput || getCategory(item);
-    
-    let finalPerson = config.defaultPerson || '兔';
-    if (personInput) {
-        const mapped = getPerson(personInput, config.defaultPerson || '兔');
-        if (mapped !== (config.defaultPerson || '兔') || personInput === (config.defaultPerson || '兔')) {
-            finalPerson = mapped;
+    let finalCategory = '';
+    if (categoryInput) {
+        const mappedCat = getCategory(categoryInput);
+        if (mappedCat) {
+            finalCategory = mappedCat;
         } else {
-            finalPerson = personInput;
+            finalCategory = categoryInput;
         }
     } else {
+        finalCategory = getCategory(item);
+    }
+
+    let finalPerson = config.defaultPerson || '兔';
+    if (personInput) {
+        // 如果手動輸入了對象，先看是否命中關鍵字
+        const mappedByInput = getPerson(personInput, '');
+        if (mappedByInput) {
+            finalPerson = mappedByInput;
+        } else {
+            // 有輸入但無法匹配
+            finalPerson = '請選擇對象';
+        }
+    } else {
+        // 未輸入則從項目名稱自動歸類，若無匹配則用預設值
         finalPerson = getPerson(item, config.defaultPerson || '兔');
     }
 
@@ -251,7 +268,7 @@ function initUI() {
     const viewCategory = document.getElementById('viewCategory');
     const viewPerson = document.getElementById('viewPerson');
     const statusMsg = document.getElementById('statusMsg');
-    
+
     const selectorModal = document.getElementById('selectorModal');
     const selectorTitle = document.getElementById('selectorTitle');
     const selectorOptions = document.getElementById('selectorOptions');
@@ -261,21 +278,39 @@ function initUI() {
         if (parsed) {
             currentData = parsed;
             viewDate.innerText = parsed.date;
-            
+
             // 顯示 金額 | 兔兔
             const amtStr = parsed.amount || '--';
             const tutuStr = parsed.tutuAmount ? ` | ${parsed.tutuAmount}` : '';
             viewAmount.innerText = amtStr + tutuStr;
 
             viewItem.innerText = parsed.item || '--';
-            viewCategory.innerText = parsed.category || '--';
-            viewPerson.innerText = parsed.person || '--';
+
+            // 處理類別文字顏色與內容
+            if (parsed.category) {
+                viewCategory.innerText = parsed.category;
+                viewCategory.classList.remove('error-text');
+            } else {
+                viewCategory.innerText = '請選擇類別';
+                viewCategory.classList.add('error-text');
+            }
+
+            // 處理對象文字顏色
+            if (parsed.person === '請選擇對象') {
+                viewPerson.innerText = parsed.person;
+                viewPerson.classList.add('error-text');
+            } else {
+                viewPerson.innerText = parsed.person || '--';
+                viewPerson.classList.remove('error-text');
+            }
         } else {
             // Reset preview if invalid
             viewAmount.innerText = '--';
             viewItem.innerText = '--';
             viewCategory.innerText = '--';
+            viewCategory.classList.remove('error-text');
             viewPerson.innerText = '--';
+            viewPerson.classList.remove('error-text');
         }
     });
 
@@ -392,9 +427,9 @@ function initUI() {
         selectorOptions.innerHTML = options.map(opt => `
             <div class="selector-item">${opt}</div>
         `).join('');
-        
+
         selectorModal.style.display = 'flex';
-        
+
         const items = selectorOptions.querySelectorAll('.selector-item');
         items.forEach(item => {
             item.onclick = () => {
@@ -410,16 +445,16 @@ function initUI() {
 
     document.getElementById('boxCategory').onclick = () => {
         const categories = Object.keys(CATEGORY_MAP);
-        if (!categories.includes('其他')) categories.push('其他');
+        // 不再加入 "其他"
         openSelector('選擇類別', categories, (val) => {
             currentData.category = val;
             viewCategory.innerText = val;
+            viewCategory.classList.remove('error-text');
         });
     };
 
     document.getElementById('boxPerson').onclick = () => {
         const persons = Object.keys(PERSON_MAP);
-        // 如果預設值不在裡面，也加進去
         const cfg = getConfig();
         if (cfg.defaultPerson && !persons.includes(cfg.defaultPerson)) {
             persons.push(cfg.defaultPerson);
@@ -427,6 +462,7 @@ function initUI() {
         openSelector('選擇對象', persons, (val) => {
             currentData.person = val;
             viewPerson.innerText = val;
+            viewPerson.classList.remove('error-text');
         });
     };
 }
