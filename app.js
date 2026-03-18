@@ -71,7 +71,13 @@ function getPerson(text, defaultVal = '兔') {
 
 function parseInput(val) {
     const config = getConfig();
-    const content = val.trim();
+    let content = val.trim();
+    
+    // 將常見全形與半形標點符號替換為空格，並合併連續空格
+    content = content.replace(/[，。！？；：、！!？?；;：:（）()[\]{}/\\|_~`'"]/g, ' ')
+                     .replace(/\s+/g, ' ')
+                     .trim();
+    
     if (!content) return null;
 
     // 尋找所有數字區塊
