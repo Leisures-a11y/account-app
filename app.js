@@ -186,9 +186,10 @@ function initUI() {
             <div class="preview-card" id="previewCard">
                 <div class="preview-title">解析預覽</div>
                 <div class="preview-grid">
-                    <div class="preview-item">
-                        <span class="label">日期</span>
+                    <div class="preview-item clickable" id="boxDate">
+                        <span class="label">日期 (點擊修改)</span>
                         <span class="value" id="viewDate">--</span>
+                        <input type="date" id="datePicker" style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;">
                     </div>
                     <div class="preview-item">
                         <span class="label">金額 | 兔兔</span>
@@ -198,7 +199,7 @@ function initUI() {
                         <span class="label">項目</span>
                         <span class="value" id="viewItem">--</span>
                     </div>
-            <div class="preview-item clickable" id="boxCategory">
+                    <div class="preview-item clickable" id="boxCategory">
                         <span class="label">類別 (點擊修改)</span>
                         <span class="value" id="viewCategory">--</span>
                     </div>
@@ -284,8 +285,12 @@ function initUI() {
     mainInput.addEventListener('input', (e) => {
         const parsed = parseInput(e.target.value);
         if (parsed) {
+            const savedDate = currentData.date;
             currentData = parsed;
-            viewDate.innerText = parsed.date;
+            currentData.date = savedDate; // 保持現有日期（可能是手動更改過的）
+
+            viewDate.innerText = currentData.date;
+            document.getElementById('datePicker').value = currentData.date;
 
             // 顯示 金額 | 兔兔
             const amtStr = parsed.amount || '--';
@@ -383,8 +388,14 @@ function initUI() {
                 showStatus('✅ 儲存成功！', 'success');
                 mainInput.value = '';
                 // 重置預覽介面
-                const previewIds = ['viewDate', 'viewAmount', 'viewItem', 'viewCategory', 'viewPerson'];
+                const previewIds = ['viewAmount', 'viewItem', 'viewCategory', 'viewPerson'];
                 previewIds.forEach(id => document.getElementById(id).innerText = '--');
+                
+                // 日期恢復為今日
+                currentData.date = getLocalDateString();
+                document.getElementById('viewDate').innerText = currentData.date;
+                document.getElementById('datePicker').value = currentData.date;
+
                 console.log('傳送完成 (Form Submitted)');
             }, 1000);
 
@@ -472,6 +483,23 @@ function initUI() {
             viewPerson.innerText = val;
             viewPerson.classList.remove('error-text');
         });
+    };
+
+    // 原生日期選擇
+    const dateBox = document.getElementById('boxDate');
+    const datePicker = document.getElementById('datePicker');
+    dateBox.onclick = () => {
+        // 設定目前的日期給 picker，以防用戶手動輸入
+        datePicker.value = currentData.date;
+        datePicker.showPicker(); // 呼叫流覽器原生選擇器
+    };
+
+    datePicker.onchange = (e) => {
+        const newVal = e.target.value;
+        if (newVal) {
+            currentData.date = newVal;
+            viewDate.innerText = newVal;
+        }
     };
 }
 
