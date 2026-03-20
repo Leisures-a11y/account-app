@@ -186,11 +186,11 @@ function initUI() {
             <div class="preview-card" id="previewCard">
                 <div class="preview-title">解析預覽</div>
                 <div class="preview-grid">
-                    <div class="preview-item clickable" id="boxDate" style="position: relative;">
-                        <span class="label" style="pointer-events: none;">日期 (點擊修改)</span>
-                        <span class="value" id="viewDate" style="pointer-events: none;">--</span>
-                        <input type="date" id="datePicker" style="position: absolute; opacity: 0; width: 100%; height: 100%; top: 0; left: 0; cursor: pointer; -webkit-appearance: none;">
-                    </div>
+                    <label class="preview-item clickable" id="boxDate" for="datePicker" style="position: relative; display: flex; flex-direction: column;">
+                        <span class="label">日期 (點擊修改)</span>
+                        <span class="value" id="viewDate">--</span>
+                        <input type="date" id="datePicker" style="position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;">
+                    </label>
                     <div class="preview-item">
                         <span class="label">金額 | 兔兔</span>
                         <span class="value" id="viewAmount">--</span>
@@ -486,14 +486,15 @@ function initUI() {
     };
 
     // 原生日期選擇
-    const dateBox = document.getElementById('boxDate');
     const datePicker = document.getElementById('datePicker');
-    dateBox.onclick = () => {
-        // 同步目前的日期給 picker，確保它跟目前的 UI 一致
+    // 使用 Label 自動觸發輸入框，JS 僅負責同步原始日期
+    const boxDate = document.getElementById('boxDate');
+    boxDate.addEventListener('mousedown', () => {
         datePicker.value = currentData.date;
-        // 我們依賴 input 自身的原生行為來打開選擇器，
-        // 透過將 input 覆蓋在容器上並設置 pointer-events，Safari 會自動處理它。
-    };
+    });
+    boxDate.addEventListener('touchstart', () => {
+        datePicker.value = currentData.date;
+    });
 
     datePicker.onchange = (e) => {
         const newVal = e.target.value;
