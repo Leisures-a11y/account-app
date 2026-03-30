@@ -35,6 +35,15 @@ const PERSON_MAP = {
     'Home': ['家人', '家庭', '全家']
 };
 
+function getConfig() {
+    const saved = localStorage.getItem(CONFIG_KEY);
+    return saved ? JSON.parse(saved) : DEFAULT_CONFIG;
+}
+
+function saveConfig(config) {
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+}
+
 function getLocalDateString() {
     const now = new Date();
     const y = now.getFullYear();
@@ -48,45 +57,9 @@ let currentData = {
     amount: '',
     item: '',
     category: '',
-    person: '兔',
+    person: getConfig().defaultPerson || '兔',
     tutuAmount: ''
 };
-
-// 記錄是否已手動選擇，避免 input 事件覆寫
-let isCategoryManual = false;
-let isPersonManual = false;
-let isDateManual = false;
-
-function chineseToNumber(s) {
-    if (!s) return 0;
-    if (/^\d+$/.test(s)) return parseInt(s);
-    const map = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '零': 0, '○': 0, '0': 0 };
-    if (s.length === 1) return map[s] || 0;
-    if (s.length === 2) {
-        if (s[0] === '十') return 10 + map[s[1]];
-        if (s[1] === '十') return map[s[0]] * 10;
-        return map[s[0]] * 10 + map[s[1]];
-    }
-    if (s.length === 3) {
-        if (s[1] === '十') return map[s[0]] * 10 + map[s[2]];
-    }
-    // 處理如 '二零二六' 等年份
-    let res = '';
-    for (let char of s) {
-        res += (map[char] !== undefined) ? map[char] : char;
-    }
-    return parseInt(res) || 0;
-}
-
-
-function getConfig() {
-    const saved = localStorage.getItem(CONFIG_KEY);
-    return saved ? JSON.parse(saved) : DEFAULT_CONFIG;
-}
-
-function saveConfig(config) {
-    localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-}
 
 function getCategory(text) {
     if (!text) return '';
@@ -342,6 +315,11 @@ function initUI() {
     const statusMsg = document.getElementById('statusMsg');
     const micBtn = document.getElementById('micBtn');
 
+    // 初始化預覽顯示
+    viewDate.innerText = currentData.date;
+    viewPerson.innerText = currentData.person;
+    document.getElementById('datePicker').value = currentData.date;
+
     // 語音輸入邏輯
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -379,14 +357,6 @@ function initUI() {
             }
         };
 
-        // 點擊輸入框時自動開啟語音 (符合 Android/iOS 手勢觸發要求)
-        mainInput.addEventListener('click', () => {
-            try {
-                recognition.start();
-            } catch (e) {
-                // 忽略已在運行的錯誤
-            }
-        });
 
         // 麥克風按鈕點擊切換
         micBtn.addEventListener('click', (e) => {
@@ -457,7 +427,7 @@ function initUI() {
             viewItem.innerText = '--';
             viewCategory.innerText = '--';
             viewCategory.classList.remove('error-text');
-            viewPerson.innerText = '--';
+            viewPerson.innerText = getConfig().defaultPerson || '兔';
             viewPerson.classList.remove('error-text');
         }
     });
@@ -577,6 +547,13 @@ function initUI() {
             entryTutuAmount: document.getElementById('cfgTutuAmount').value
         };
         saveConfig(newCfg);
+
+        // 立即更新當前預設對象顯示 (若未手動修改過)
+        if (!isPersonManual) {
+            currentData.person = newCfg.defaultPerson || '兔';
+            viewPerson.innerText = currentData.person;
+        }
+
         modal.style.display = 'none';
         showStatus('✅ 設定已儲存', 'success');
     });
