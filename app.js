@@ -19,7 +19,7 @@ const CATEGORY_MAP = {
     '交通、加油、停車、保養車車': ['保養', '捷運', '公車', '加油', '高鐵', '台鐵', '停車'],
     '休閒旅遊': ['住宿費', '門票', '休閒綠遊'],
     '水電瓦斯通訊': ['室內網路', '管理費', '手機費', '電費', '水費', '瓦斯費'],
-    '育醫療、保險': ['保險', '謝德貴', '馬偕', '台大生醫', '回診'],
+    '醫療、保險': ['保險', '謝德貴', '馬偕', '台大生醫', '回診', '小森林'],
     '稅金、罰單': ['稅', '罰單'],
     '教育學習、書': ['書', '課程'],
     '托育、學費': ['幼稚園', '托嬰', '註冊費', '學費'],
@@ -51,6 +51,33 @@ let currentData = {
     person: '兔',
     tutuAmount: ''
 };
+
+// 記錄是否已手動選擇，避免 input 事件覆寫
+let isCategoryManual = false;
+let isPersonManual = false;
+let isDateManual = false;
+
+function chineseToNumber(s) {
+    if (!s) return 0;
+    if (/^\d+$/.test(s)) return parseInt(s);
+    const map = { '一': 1, '二': 2, '三': 3, '四': 4, '五': 5, '六': 6, '七': 7, '八': 8, '九': 9, '十': 10, '零': 0, '○': 0, '0': 0 };
+    if (s.length === 1) return map[s] || 0;
+    if (s.length === 2) {
+        if (s[0] === '十') return 10 + map[s[1]];
+        if (s[1] === '十') return map[s[0]] * 10;
+        return map[s[0]] * 10 + map[s[1]];
+    }
+    if (s.length === 3) {
+        if (s[1] === '十') return map[s[0]] * 10 + map[s[2]];
+    }
+    // 處理如 '二零二六' 等年份
+    let res = '';
+    for (let char of s) {
+        res += (map[char] !== undefined) ? map[char] : char;
+    }
+    return parseInt(res) || 0;
+}
+
 
 function getConfig() {
     const saved = localStorage.getItem(CONFIG_KEY);
@@ -84,26 +111,64 @@ function getPerson(text, defaultVal = '兔') {
 function parseInput(val) {
     const config = getConfig();
     let content = val.trim();
+    if (!content) return null;
+
+    let finalDate = getLocalDateString();
+    let dateStrLength = 0;
+
+    // 1. 嘗試解析開頭的日期
+    // 數字型日期: 2026/3/4, 3/4, 03/04 等 (支持 / . -)
+    const dateMatch = content.match(/^(\d{2,4}[/.\-])?(\d{1,2})[/.\-](\d{1,2})(\s|$)/);
+    // 中文型日期: 2026年3月4日, 三月四號, 十二月三十一日等
+    const chinDateMatch = content.match(/^(([\d一二三四五六七八九十百]+)年)?([\d一二三四五六七八九十]+)月([\d一二三四五六七八九十]+)[日號](\s|$)/);
+
+    if (dateMatch) {
+        dateStrLength = dateMatch[0].length;
+        let y = dateMatch[1] ? dateMatch[1].replace(/[/.\-]/, '') : new Date().getFullYear();
+        if (y.toString().length === 2) y = '20' + y;
+        let m = dateMatch[2].padStart(2, '0');
+        let d = dateMatch[3].padStart(2, '0');
+        finalDate = `${y}-${m}-${d}`;
+    } else if (chinDateMatch) {
+        dateStrLength = chinDateMatch[0].length;
+        let y = chinDateMatch[2] ? chineseToNumber(chinDateMatch[2]) : new Date().getFullYear();
+        if (y < 100) y += 2000;
+        let m = String(chineseToNumber(chinDateMatch[3])).padStart(2, '0');
+        let d = String(chineseToNumber(chinDateMatch[4])).padStart(2, '0');
+        finalDate = `${y}-${m}-${d}`;
+    }
+
+    // 剩餘內容
+    let remainContent = content.substring(dateStrLength).trim();
 
     // 將常見全形與半形標點符號替換為空格，並合併連續空格
-    content = content.replace(/[，。！？；：、！!？?；;：:（）()[\]{}/\\|_~`'"]/g, ' ')
+    let normalized = remainContent.replace(/[，。！？；：、！!？?；;：:（）()[\]{}/\\|_~`'"]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
-    if (!content) return null;
+    if (!normalized) {
+        return {
+            date: finalDate,
+            item: remainContent || '未命名項目',
+            amount: '',
+            tutuAmount: '',
+            category: getCategory(remainContent),
+            person: getPerson(remainContent, config.defaultPerson || '兔')
+        };
+    }
 
     // 尋找所有數字區塊
-    const numbers = content.match(/\d+/g) || [];
+    const numbers = normalized.match(/\d+/g) || [];
 
     // 如果沒有數字，則視為只有項目
     if (numbers.length === 0) {
         return {
-            date: getLocalDateString(),
-            item: content,
+            date: finalDate,
+            item: normalized,
             amount: '',
             tutuAmount: '',
-            category: getCategory(content),
-            person: getPerson(content, config.defaultPerson || '兔')
+            category: getCategory(normalized),
+            person: getPerson(normalized, config.defaultPerson || '兔')
         };
     }
 
@@ -112,13 +177,12 @@ function parseInput(val) {
     const secondAmountStr = numbers[1] || '';
 
     // 數字前的字串為項目（容許空格）
-    const firstAmountIndex = content.indexOf(firstAmountStr);
-    const item = content.substring(0, firstAmountIndex).trim();
+    const firstAmountIndex = normalized.indexOf(firstAmountStr);
+    const item = normalized.substring(0, firstAmountIndex).trim();
 
     // 移除第一個金額後的所有內容，並將第二個金額字串替換為空格以利解析其餘欄位
-    let remainStr = content.substring(firstAmountIndex + firstAmountStr.length);
+    let remainStr = normalized.substring(firstAmountIndex + firstAmountStr.length);
     if (secondAmountStr) {
-        // 使用正則替換掉第一個出現的第二個數字，避開重複字串問題
         remainStr = remainStr.replace(secondAmountStr, ' ');
     }
     const remainParts = remainStr.split(/[，, ]+/).filter(p => p !== '');
@@ -148,21 +212,18 @@ function parseInput(val) {
 
     let finalPerson = config.defaultPerson || '兔';
     if (personInput) {
-        // 如果手動輸入了對象，先看是否命中關鍵字
         const mappedByInput = getPerson(personInput, '');
         if (mappedByInput) {
             finalPerson = mappedByInput;
         } else {
-            // 有輸入但無法匹配
             finalPerson = '請選擇對象';
         }
     } else {
-        // 未輸入則從項目名稱自動歸類，若無匹配則用預設值
         finalPerson = getPerson(item, config.defaultPerson || '兔');
     }
 
     return {
-        date: getLocalDateString(),
+        date: finalDate,
         item: item || '未命名項目',
         amount: firstAmountStr,
         tutuAmount: secondAmountStr,
@@ -170,6 +231,7 @@ function parseInput(val) {
         person: finalPerson
     };
 }
+
 
 function initUI() {
     const app = document.getElementById('app');
@@ -180,7 +242,8 @@ function initUI() {
             </header>
             
             <div class="input-section">
-                <input type="text" id="mainInput" placeholder="項目 100 兔 食 50 (項目 金額 人 類別 兔兔金額)" autocomplete="off">
+                <input type="text" id="mainInput" placeholder="3/4 早餐 100 兔 食 50 (日期 項目 金額 人 類別 兔兔金額)" autocomplete="off">
+                <button class="mic-btn" id="micBtn" type="button" title="語音輸入">🎤</button>
             </div>
 
             <div class="preview-card" id="previewCard">
@@ -277,6 +340,67 @@ function initUI() {
     const viewCategory = document.getElementById('viewCategory');
     const viewPerson = document.getElementById('viewPerson');
     const statusMsg = document.getElementById('statusMsg');
+    const micBtn = document.getElementById('micBtn');
+
+    // 語音輸入邏輯
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'zh-TW';
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+            micBtn.classList.add('listening');
+            showStatus('🎤 正在聆聽，請說話...', '');
+        };
+
+        recognition.onend = () => {
+            micBtn.classList.remove('listening');
+        };
+
+        recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            mainInput.value = transcript;
+            // 手動觸發 input 事件以觸發解析邏輯
+            mainInput.dispatchEvent(new Event('input', { bubbles: true }));
+            showStatus('✅ 語音輸入完成', 'success');
+        };
+
+        recognition.onerror = (event) => {
+            console.error('語音辨識錯誤:', event.error);
+            micBtn.classList.remove('listening');
+            if (event.error === 'not-allowed') {
+                showStatus('❌ 請允許麥克風權限', 'error');
+            } else if (event.error === 'no-speech') {
+                // 忽略沒說話的情況，不顯示錯誤訊息以免干擾
+            } else {
+                showStatus('❌ 語音辨識失敗 (' + event.error + ')', 'error');
+            }
+        };
+
+        // 點擊輸入框時自動開啟語音 (符合 Android/iOS 手勢觸發要求)
+        mainInput.addEventListener('click', () => {
+            try {
+                recognition.start();
+            } catch (e) {
+                // 忽略已在運行的錯誤
+            }
+        });
+
+        // 麥克風按鈕點擊切換
+        micBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            try {
+                recognition.start();
+            } catch (e) {
+                recognition.stop();
+            }
+        });
+    } else {
+        micBtn.style.display = 'none';
+        console.warn('此瀏覽器不支援 Web Speech API');
+    }
 
     const selectorModal = document.getElementById('selectorModal');
     const selectorTitle = document.getElementById('selectorTitle');
@@ -286,22 +410,30 @@ function initUI() {
         const parsed = parseInput(e.target.value);
         if (parsed) {
             const savedDate = currentData.date;
+            const savedCategory = currentData.category;
+            const savedPerson = currentData.person;
+
             currentData = parsed;
-            currentData.date = savedDate; // 保持現有日期（可能是手動更改過的）
+            // 如果手動選擇過，則維持手動選擇的值
+            if (isDateManual) {
+                currentData.date = savedDate;
+            }
+            if (isCategoryManual) currentData.category = savedCategory;
+            if (isPersonManual) currentData.person = savedPerson;
 
             viewDate.innerText = currentData.date;
             document.getElementById('datePicker').value = currentData.date;
 
             // 顯示 金額 | 兔兔
-            const amtStr = parsed.amount || '--';
-            const tutuStr = parsed.tutuAmount ? ` | ${parsed.tutuAmount}` : '';
+            const amtStr = currentData.amount || '--';
+            const tutuStr = currentData.tutuAmount ? ` | ${currentData.tutuAmount}` : '';
             viewAmount.innerText = amtStr + tutuStr;
 
-            viewItem.innerText = parsed.item || '--';
+            viewItem.innerText = currentData.item || '--';
 
             // 處理類別文字顏色與內容
-            if (parsed.category) {
-                viewCategory.innerText = parsed.category;
+            if (currentData.category) {
+                viewCategory.innerText = currentData.category;
                 viewCategory.classList.remove('error-text');
             } else {
                 viewCategory.innerText = '請選擇類別';
@@ -309,15 +441,18 @@ function initUI() {
             }
 
             // 處理對象文字顏色
-            if (parsed.person === '請選擇對象') {
-                viewPerson.innerText = parsed.person;
+            if (currentData.person === '請選擇對象') {
+                viewPerson.innerText = currentData.person;
                 viewPerson.classList.add('error-text');
             } else {
-                viewPerson.innerText = parsed.person || '--';
+                viewPerson.innerText = currentData.person || '--';
                 viewPerson.classList.remove('error-text');
             }
         } else {
             // Reset preview if invalid
+            isCategoryManual = false;
+            isPersonManual = false;
+            isDateManual = false;
             viewAmount.innerText = '--';
             viewItem.innerText = '--';
             viewCategory.innerText = '--';
@@ -391,8 +526,14 @@ function initUI() {
                 const previewIds = ['viewAmount', 'viewItem', 'viewCategory', 'viewPerson'];
                 previewIds.forEach(id => document.getElementById(id).innerText = '--');
 
+                // 重置手動標記
+                isCategoryManual = false;
+                isPersonManual = false;
+                isDateManual = false;
+
                 // 日期恢復為今日
                 currentData.date = getLocalDateString();
+
                 document.getElementById('viewDate').innerText = currentData.date;
                 document.getElementById('datePicker').value = currentData.date;
 
@@ -467,6 +608,7 @@ function initUI() {
         // 不再加入 "其他"
         openSelector('選擇類別', categories, (val) => {
             currentData.category = val;
+            isCategoryManual = true;
             viewCategory.innerText = val;
             viewCategory.classList.remove('error-text');
         });
@@ -480,6 +622,7 @@ function initUI() {
         }
         openSelector('選擇對象', persons, (val) => {
             currentData.person = val;
+            isPersonManual = true;
             viewPerson.innerText = val;
             viewPerson.classList.remove('error-text');
         });
@@ -498,6 +641,7 @@ function initUI() {
         const newVal = e.target.value;
         if (newVal) {
             currentData.date = newVal;
+            isDateManual = true;
             viewDate.innerText = newVal;
         }
     };
